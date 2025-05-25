@@ -1,5 +1,5 @@
 name: ht_auth_repository
-description: ...
+description: A repository package that provides an abstraction layer over authentication operations.
 repository: https://github.com/headlines-toolkit/ht-auth-repository
 publish_to: none
 
