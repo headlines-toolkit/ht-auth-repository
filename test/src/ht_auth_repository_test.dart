@@ -35,8 +35,8 @@ void main() {
         when(() => mockAuthClient.authStateChanges)
             .thenAnswer((_) => streamController.stream);
 
-        expect(authRepository.authStateChanges,
-            equals(streamController.stream));
+        expect(
+            authRepository.authStateChanges, equals(streamController.stream),);
 
         streamController.close();
       });
