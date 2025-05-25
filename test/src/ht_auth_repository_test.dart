@@ -36,7 +36,9 @@ void main() {
             .thenAnswer((_) => streamController.stream);
 
         expect(
-            authRepository.authStateChanges, equals(streamController.stream),);
+          authRepository.authStateChanges,
+          equals(streamController.stream),
+        );
 
         streamController.close();
       });
