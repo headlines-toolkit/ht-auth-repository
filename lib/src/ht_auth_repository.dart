@@ -4,6 +4,7 @@
 import 'dart:async';
 
 import 'package:ht_auth_client/ht_auth_client.dart';
+import 'package:ht_kv_storage_service/ht_kv_storage_service.dart';
 import 'package:ht_shared/ht_shared.dart';
 
 /// {@template ht_auth_repository}
@@ -18,10 +19,14 @@ class HtAuthRepository {
   ///
   /// Requires an instance of [HtAuthClient] to handle the actual
   /// authentication operations.
-  const HtAuthRepository({required HtAuthClient authClient})
-      : _authClient = authClient;
+  const HtAuthRepository({
+    required HtAuthClient authClient,
+    required HtKVStorageService storageService,
+  })  : _authClient = authClient,
+        _storageService = storageService;
 
   final HtAuthClient _authClient;
+  final HtKVStorageService _storageService;
 
   /// Stream emitting the current authenticated [User] or `null`.
   ///
@@ -97,6 +102,48 @@ class HtAuthRepository {
       await _authClient.signOut();
     } on HtHttpException {
       rethrow; // Propagate client-level exceptions
+    }
+  }
+
+  /// Saves the authentication token to storage.
+  ///
+  /// Throws [StorageWriteException] if the write operation fails.
+  Future<void> saveAuthToken(String token) async {
+    try {
+      await _storageService.writeString(
+        key: StorageKey.authToken.stringValue,
+        value: token,
+      );
+    } on StorageWriteException {
+      rethrow;
+    }
+  }
+
+  /// Retrieves the authentication token from storage.
+  ///
+  /// Returns `null` if the token is not found.
+  /// Throws [StorageReadException] if the read operation fails for other reasons.
+  /// Throws [StorageTypeMismatchException] if the stored value is not a string.
+  Future<String?> getAuthToken() async {
+    try {
+      return await _storageService.readString(
+        key: StorageKey.authToken.stringValue,
+      );
+    } on StorageReadException {
+      rethrow;
+    } on StorageTypeMismatchException {
+      rethrow;
+    }
+  }
+
+  /// Clears the authentication token from storage.
+  ///
+  /// Throws [StorageDeleteException] if the delete operation fails.
+  Future<void> clearAuthToken() async {
+    try {
+      await _storageService.delete(key: StorageKey.authToken.stringValue);
+    } on StorageDeleteException {
+      rethrow;
     }
   }
 }
