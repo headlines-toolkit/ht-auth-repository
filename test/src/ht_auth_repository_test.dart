@@ -5,6 +5,7 @@ import 'dart:async';
 
 import 'package:ht_auth_client/ht_auth_client.dart';
 import 'package:ht_auth_repository/ht_auth_repository.dart';
+import 'package:ht_kv_storage_service/ht_kv_storage_service.dart';
 import 'package:ht_shared/ht_shared.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:test/test.dart';
@@ -12,17 +13,25 @@ import 'package:test/test.dart';
 // Mock HtAuthClient
 class MockHtAuthClient extends Mock implements HtAuthClient {}
 
+// Mock HtKVStorageService
+class MockHtKVStorageService extends Mock implements HtKVStorageService {}
+
 // Mock User
 class MockUser extends Mock implements User {}
 
 void main() {
   group('HtAuthRepository', () {
     late HtAuthClient mockAuthClient;
+    late HtKVStorageService mockStorageService;
     late HtAuthRepository authRepository;
 
     setUp(() {
       mockAuthClient = MockHtAuthClient();
-      authRepository = HtAuthRepository(authClient: mockAuthClient);
+      mockStorageService = MockHtKVStorageService();
+      authRepository = HtAuthRepository(
+        authClient: mockAuthClient,
+        storageService: mockStorageService,
+      );
     });
 
     test('can be instantiated', () {
@@ -170,6 +179,176 @@ void main() {
           throwsA(equals(exception)),
         );
         verify(() => mockAuthClient.signOut()).called(1);
+      });
+    });
+
+    group('saveAuthToken', () {
+      test('delegates to storageService.writeString', () async {
+        const token = 'test_token';
+        when(
+          () => mockStorageService.writeString(
+            key: StorageKey.authToken.stringValue,
+            value: token,
+          ),
+        ).thenAnswer((_) async => Future.value());
+
+        await authRepository.saveAuthToken(token);
+
+        verify(
+          () => mockStorageService.writeString(
+            key: StorageKey.authToken.stringValue,
+            value: token,
+          ),
+        ).called(1);
+      });
+
+      test('re-throws StorageWriteException from storageService', () async {
+        const token = 'test_token';
+        final exception = StorageWriteException(
+          StorageKey.authToken.stringValue,
+          token,
+        );
+        when(
+          () => mockStorageService.writeString(
+            key: StorageKey.authToken.stringValue,
+            value: token,
+          ),
+        ).thenThrow(exception);
+
+        expect(
+          () => authRepository.saveAuthToken(token),
+          throwsA(equals(exception)),
+        );
+        verify(
+          () => mockStorageService.writeString(
+            key: StorageKey.authToken.stringValue,
+            value: token,
+          ),
+        ).called(1);
+      });
+    });
+
+    group('getAuthToken', () {
+      test('delegates to storageService.readString and returns token',
+          () async {
+        const token = 'test_token';
+        when(
+          () => mockStorageService.readString(
+            key: StorageKey.authToken.stringValue,
+          ),
+        ).thenAnswer((_) async => token);
+
+        final result = await authRepository.getAuthToken();
+
+        expect(result, equals(token));
+        verify(
+          () => mockStorageService.readString(
+            key: StorageKey.authToken.stringValue,
+          ),
+        ).called(1);
+      });
+
+      test(
+          'delegates to storageService.readString and returns null if not found',
+          () async {
+        when(
+          () => mockStorageService.readString(
+            key: StorageKey.authToken.stringValue,
+          ),
+        ).thenAnswer((_) async => null);
+
+        final result = await authRepository.getAuthToken();
+
+        expect(result, isNull);
+        verify(
+          () => mockStorageService.readString(
+            key: StorageKey.authToken.stringValue,
+          ),
+        ).called(1);
+      });
+
+      test('re-throws StorageReadException from storageService', () async {
+        final exception = StorageReadException(
+          StorageKey.authToken.stringValue,
+        );
+        when(
+          () => mockStorageService.readString(
+            key: StorageKey.authToken.stringValue,
+          ),
+        ).thenThrow(exception);
+
+        expect(
+          () => authRepository.getAuthToken(),
+          throwsA(equals(exception)),
+        );
+        verify(
+          () => mockStorageService.readString(
+            key: StorageKey.authToken.stringValue,
+          ),
+        ).called(1);
+      });
+
+      test('re-throws StorageTypeMismatchException from storageService',
+          () async {
+        final exception = StorageTypeMismatchException(
+          StorageKey.authToken.stringValue,
+          String,
+          int,
+        );
+        when(
+          () => mockStorageService.readString(
+            key: StorageKey.authToken.stringValue,
+          ),
+        ).thenThrow(exception);
+
+        expect(
+          () => authRepository.getAuthToken(),
+          throwsA(equals(exception)),
+        );
+        verify(
+          () => mockStorageService.readString(
+            key: StorageKey.authToken.stringValue,
+          ),
+        ).called(1);
+      });
+    });
+
+    group('clearAuthToken', () {
+      test('delegates to storageService.delete', () async {
+        when(
+          () => mockStorageService.delete(
+            key: StorageKey.authToken.stringValue,
+          ),
+        ).thenAnswer((_) async => Future.value());
+
+        await authRepository.clearAuthToken();
+
+        verify(
+          () => mockStorageService.delete(
+            key: StorageKey.authToken.stringValue,
+          ),
+        ).called(1);
+      });
+
+      test('re-throws StorageDeleteException from storageService', () async {
+        final exception = StorageDeleteException(
+          StorageKey.authToken.stringValue,
+        );
+        when(
+          () => mockStorageService.delete(
+            key: StorageKey.authToken.stringValue,
+          ),
+        ).thenThrow(exception);
+
+        expect(
+          () => authRepository.clearAuthToken(),
+          throwsA(equals(exception)),
+        );
+        verify(
+          () => mockStorageService.delete(
+            key: StorageKey.authToken.stringValue,
+          ),
+        ).called(1);
       });
     });
   });
