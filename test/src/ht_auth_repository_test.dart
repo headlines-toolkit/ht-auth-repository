@@ -105,23 +105,43 @@ void main() {
     });
 
     group('verifySignInCode', () {
-      test('delegates to client and returns user on success', () async {
-        const email = 'test@example.com';
-        const code = '123456';
-        final mockUser = MockUser();
+      const email = 'test@example.com';
+      const code = '123456';
+      const testToken = 'sample_token';
+      late User mockUser;
+      late AuthSuccessResponse mockAuthResponse;
+
+      setUp(() {
+        mockUser = MockUser();
+        mockAuthResponse =
+            AuthSuccessResponse(user: mockUser, token: testToken);
+      });
+
+      test(
+          'calls client, saves token, and returns user on successful verification',
+          () async {
         when(() => mockAuthClient.verifySignInCode(email, code))
-            .thenAnswer((_) async => mockUser);
+            .thenAnswer((_) async => mockAuthResponse);
+        when(
+          () => mockStorageService.writeString(
+            key: StorageKey.authToken.stringValue,
+            value: testToken,
+          ),
+        ).thenAnswer((_) async {});
 
         final user = await authRepository.verifySignInCode(email, code);
 
         expect(user, equals(mockUser));
         verify(() => mockAuthClient.verifySignInCode(email, code)).called(1);
+        verify(
+          () => mockStorageService.writeString(
+            key: StorageKey.authToken.stringValue,
+            value: testToken,
+          ),
+        ).called(1);
       });
 
-      test('delegates to client and re-throws HtHttpException on failure',
-          () async {
-        const email = 'test@example.com';
-        const code = '123456';
+      test('re-throws HtHttpException from client on client failure', () async {
         final exception = AuthenticationException('Invalid code');
         when(() => mockAuthClient.verifySignInCode(email, code))
             .thenThrow(exception);
@@ -131,23 +151,74 @@ void main() {
           throwsA(equals(exception)),
         );
         verify(() => mockAuthClient.verifySignInCode(email, code)).called(1);
+        verifyNever(
+          () => mockStorageService.writeString(
+            key: any(named: 'key'),
+            value: any(named: 'value'),
+          ),
+        );
+      });
+
+      test(
+          're-throws StorageException from storageService on token save failure',
+          () async {
+        when(() => mockAuthClient.verifySignInCode(email, code))
+            .thenAnswer((_) async => mockAuthResponse);
+        final exception = StorageWriteException(
+          StorageKey.authToken.stringValue,
+          testToken,
+        );
+        when(
+          () => mockStorageService.writeString(
+            key: StorageKey.authToken.stringValue,
+            value: testToken,
+          ),
+        ).thenThrow(exception);
+
+        expect(
+          () => authRepository.verifySignInCode(email, code),
+          throwsA(equals(exception)),
+        );
+        verify(() => mockAuthClient.verifySignInCode(email, code)).called(1);
+        // Removed verify for mockStorageService.writeString here
       });
     });
 
     group('signInAnonymously', () {
-      test('delegates to client and returns user on success', () async {
-        final mockUser = MockUser();
+      const testToken = 'anonymous_token';
+      late User mockUser;
+      late AuthSuccessResponse mockAuthResponse;
+
+      setUp(() {
+        mockUser = MockUser();
+        mockAuthResponse =
+            AuthSuccessResponse(user: mockUser, token: testToken);
+      });
+
+      test('calls client, saves token, and returns user on successful sign-in',
+          () async {
         when(() => mockAuthClient.signInAnonymously())
-            .thenAnswer((_) async => mockUser);
+            .thenAnswer((_) async => mockAuthResponse);
+        when(
+          () => mockStorageService.writeString(
+            key: StorageKey.authToken.stringValue,
+            value: testToken,
+          ),
+        ).thenAnswer((_) async {});
 
         final user = await authRepository.signInAnonymously();
 
         expect(user, equals(mockUser));
         verify(() => mockAuthClient.signInAnonymously()).called(1);
+        verify(
+          () => mockStorageService.writeString(
+            key: StorageKey.authToken.stringValue,
+            value: testToken,
+          ),
+        ).called(1);
       });
 
-      test('delegates to client and re-throws HtHttpException on failure',
-          () async {
+      test('re-throws HtHttpException from client on client failure', () async {
         final exception = ServerException('Server error');
         when(() => mockAuthClient.signInAnonymously()).thenThrow(exception);
 
@@ -156,21 +227,59 @@ void main() {
           throwsA(equals(exception)),
         );
         verify(() => mockAuthClient.signInAnonymously()).called(1);
+        verifyNever(
+          () => mockStorageService.writeString(
+            key: any(named: 'key'),
+            value: any(named: 'value'),
+          ),
+        );
+      });
+
+      test(
+          're-throws StorageException from storageService on token save failure',
+          () async {
+        when(() => mockAuthClient.signInAnonymously())
+            .thenAnswer((_) async => mockAuthResponse);
+        final exception = StorageWriteException(
+          StorageKey.authToken.stringValue,
+          testToken,
+        );
+        when(
+          () => mockStorageService.writeString(
+            key: StorageKey.authToken.stringValue,
+            value: testToken,
+          ),
+        ).thenThrow(exception);
+
+        expect(
+          () => authRepository.signInAnonymously(),
+          throwsA(equals(exception)),
+        );
+        verify(() => mockAuthClient.signInAnonymously()).called(1);
+        // Removed verify for mockStorageService.writeString here
       });
     });
 
     group('signOut', () {
-      test('delegates to client on success', () async {
-        when(() => mockAuthClient.signOut())
-            .thenAnswer((_) async => Future.value());
+      test('calls client signOut and clears token on success', () async {
+        when(() => mockAuthClient.signOut()).thenAnswer((_) async {});
+        when(
+          () => mockStorageService.delete(
+            key: StorageKey.authToken.stringValue,
+          ),
+        ).thenAnswer((_) async {});
 
         await authRepository.signOut();
 
         verify(() => mockAuthClient.signOut()).called(1);
+        verify(
+          () => mockStorageService.delete(
+            key: StorageKey.authToken.stringValue,
+          ),
+        ).called(1);
       });
 
-      test('delegates to client and re-throws HtHttpException on failure',
-          () async {
+      test('re-throws HtHttpException from client on client failure', () async {
         final exception = OperationFailedException('Sign out failed');
         when(() => mockAuthClient.signOut()).thenThrow(exception);
 
@@ -179,6 +288,30 @@ void main() {
           throwsA(equals(exception)),
         );
         verify(() => mockAuthClient.signOut()).called(1);
+        verifyNever(
+          () => mockStorageService.delete(key: any(named: 'key')),
+        );
+      });
+
+      test(
+          're-throws StorageException from storageService on token clear failure',
+          () async {
+        when(() => mockAuthClient.signOut()).thenAnswer((_) async {});
+        final exception = StorageDeleteException(
+          StorageKey.authToken.stringValue,
+        );
+        when(
+          () => mockStorageService.delete(
+            key: StorageKey.authToken.stringValue,
+          ),
+        ).thenThrow(exception);
+
+        expect(
+          () => authRepository.signOut(),
+          throwsA(equals(exception)),
+        );
+        verify(() => mockAuthClient.signOut()).called(1);
+        // Removed verify for mockStorageService.delete here
       });
     });
 
