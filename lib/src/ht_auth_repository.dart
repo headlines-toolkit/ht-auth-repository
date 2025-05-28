@@ -71,37 +71,58 @@ class HtAuthRepository {
   /// from the client.
   Future<User> verifySignInCode(String email, String code) async {
     try {
-      return await _authClient.verifySignInCode(email, code);
+      final authResponse = await _authClient.verifySignInCode(email, code);
+      // authResponse is AuthSuccessResponse
+      final token = authResponse.token;
+      final user = authResponse.user;
+      await saveAuthToken(token);
+      return user;
     } on HtHttpException {
       rethrow; // Propagate client-level exceptions
+    } on StorageException {
+      rethrow; // Propagate storage exceptions during token save
     }
   }
 
   /// Signs in the user anonymously.
   ///
   /// Delegates to the underlying [HtAuthClient]'s method.
+  /// After successful sign-in, saves the token and returns the user.
   ///
   /// Throws [HtHttpException] or its subtypes on failure, as propagated
   /// from the client.
+  /// Throws [StorageException] if saving the token fails.
   Future<User> signInAnonymously() async {
     try {
-      return await _authClient.signInAnonymously();
+      final authResponse = await _authClient.signInAnonymously();
+      // authResponse is AuthSuccessResponse
+      final token = authResponse.token;
+      final user = authResponse.user;
+      await saveAuthToken(token);
+      return user;
     } on HtHttpException {
       rethrow; // Propagate client-level exceptions
+    } on StorageException {
+      rethrow; // Propagate storage exceptions during token save
     }
   }
 
   /// Signs out the current user (whether authenticated normally or anonymously).
   ///
   /// Delegates to the underlying [HtAuthClient]'s method.
+  /// After successful sign-out, clears the authentication token from storage.
   ///
   /// Throws [HtHttpException] or its subtypes on failure, as propagated
   /// from the client.
+  /// Throws [StorageException] if clearing the token fails.
   Future<void> signOut() async {
     try {
       await _authClient.signOut();
+      await clearAuthToken();
     } on HtHttpException {
       rethrow; // Propagate client-level exceptions
+    } on StorageException {
+      rethrow; // Propagate storage exceptions during token clear
     }
   }
 
