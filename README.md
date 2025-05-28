@@ -18,17 +18,16 @@ dependencies:
 ## Features
 
 -   Abstracts authentication logic from the UI/business logic layers.
--   Provides methods mirroring `HtAuthClient`:
-    -   `authStateChanges`
-    -   `getCurrentUser`
-    -   `requestSignInCode`
-    -   `verifySignInCode`
-    -   `signInAnonymously`
-    -   `signOut`
-    -   `saveAuthToken(String token)`
-    -   `getAuthToken()`
-    -   `clearAuthToken()`
--   Propagates standardized `HtHttpException`s from the underlying client.
+-   Provides methods for a complete authentication lifecycle:
+    -   `authStateChanges`: Stream of user authentication state.
+    -   `getCurrentUser`: Retrieves the current authenticated user.
+    -   `requestSignInCode`: Initiates email+code sign-in.
+    -   `verifySignInCode`: Verifies the code, saves the auth token, and returns the user.
+    -   `signInAnonymously`: Signs in anonymously, saves the auth token, and returns the user.
+    -   `signOut`: Signs out the user and clears the auth token.
+-   Manages authentication token persistence internally using `HtKVStorageService`.
+    -   Exposes `saveAuthToken(String token)`, `getAuthToken()`, and `clearAuthToken()` for direct token manipulation if needed, but these are typically handled by the main auth flow methods.
+-   Propagates standardized `HtHttpException`s from the underlying client and `StorageException`s from the storage service.
 
 ## Usage
 
@@ -64,21 +63,42 @@ try {
   // Handle other errors
 }
 
-// Example token handling:
-Future<void> handleSuccessfulLogin(String token) async {
-  await authRepository.saveAuthToken(token);
-  print('Auth token saved.');
+// Example usage:
+try {
+  final user = await authRepository.verifySignInCode('test@example.com', '123456');
+  // User is signed in, token is saved automatically.
+  print('User signed in: ${user.id}');
+} on AuthenticationException catch (e) {
+  // Handle invalid code
+} on StorageException catch (e) {
+  // Handle failure to save token
+} catch (e) {
+  // Handle other errors
 }
 
+// Example of anonymous sign-in:
+try {
+  final anonUser = await authRepository.signInAnonymously();
+  // User is signed in anonymously, token is saved automatically.
+  print('Anonymous user signed in: ${anonUser.id}');
+} catch (e) {
+  // Handle errors
+}
+
+// Example of sign-out:
+try {
+  await authRepository.signOut();
+  // User is signed out, token is cleared automatically.
+  print('User signed out.');
+} catch (e) {
+  // Handle errors
+}
+
+// Direct token access (e.g., for HTTP client interceptors):
 Future<String?> getTokenForHttpClient() async {
   final token = await authRepository.getAuthToken();
-  print('Retrieved token: $token');
+  print('Retrieved token for HTTP client: $token');
   return token;
-}
-
-Future<void> handleSignOut() async {
-  await authRepository.clearAuthToken();
-  print('Auth token cleared.');
 }
 ```
 
