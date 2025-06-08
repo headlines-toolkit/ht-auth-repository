@@ -22,8 +22,8 @@ class HtAuthRepository {
   const HtAuthRepository({
     required HtAuthClient authClient,
     required HtKVStorageService storageService,
-  })  : _authClient = authClient,
-        _storageService = storageService;
+  }) : _authClient = authClient,
+       _storageService = storageService;
 
   final HtAuthClient _authClient;
   final HtKVStorageService _storageService;
